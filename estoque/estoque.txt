@@ -1,0 +1,13 @@
+Gerenciamento de dependências no Go
+Usando o sistema nativo do Go: o go.mod declara o módulo e suas dependências, e o go.sum trava as versões exatas para garantir builds reproduzíveis. Para adicionar dependências, usamos go get (ex: go get github.com/gin-gonic/gin). Para sincronizar após editar manualmente, go mod tidy.
+
+Framework Go utilizado
+Gin (github.com/gin-gonic/gin) — framework HTTP minimalista e performático. Ele foi escolhido por ter roteamento simples, binding de JSON nativo (ShouldBindJSON) e middleware fácil de configurar. O driver de banco usado foi o pgx (github.com/jackc/pgx/v5), que é o driver PostgreSQL mais moderno para Go.
+
+Tratamento de erros no backend
+Três camadas de tratamento foram aplicadas:
+1. Erro de conexão → em db.Init(), se o banco não responder, o serviço chama log.Fatal e encerra, evitando que suba em estado inválido.
+2. Erro de validação → em todos os handlers, ShouldBindJSON valida o corpo da requisição antes de qualquer operação. Se inválido, retorna 400 Bad Request com mensagem clara.
+3. Erro de negócio → no DebitarSaldo, há duas verificações explícitas: produto inexistente (404) e saldo insuficiente (400). Erros de banco retornam 500 com a mensagem do erro.
+Todos os erros seguem o mesmo formato de resposta:
+{ "error": "mensagem descritiva" }
