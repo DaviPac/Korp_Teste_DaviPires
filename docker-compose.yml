@@ -1,0 +1,39 @@
+services:
+
+  db_estoque:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: estoque
+    ports:
+      - "5432:5432"
+
+  db_faturamento:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: faturamento
+    ports:
+      - "5433:5432"
+
+  estoque:
+    build: ./estoque
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db_estoque:5432/estoque?sslmode=disable
+    depends_on:
+      - db_estoque
+
+  faturamento:
+    build: ./faturamento
+    ports:
+      - "8082:8082"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db_faturamento:5432/faturamento?sslmode=disable
+      ESTOQUE_URL: http://estoque:8081
+    depends_on:
+      - db_faturamento
+      - estoque
