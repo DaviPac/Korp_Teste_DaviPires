@@ -1,0 +1,6 @@
+Gerenciamento de dependências no Golang
+Foi utilizado o sistema nativo de módulos do Go, o go mod. Cada microsserviço possui seu próprio go.mod declarando as dependências, e o comando go get foi usado para adicioná-las. O go.sum garante a integridade das versões baixadas.
+Frameworks utilizados no Golang
+Foi utilizado o framework Gin (github.com/gin-gonic/gin) para criação das rotas HTTP e manipulação de requisições e respostas. Para conexão com o banco PostgreSQL foi utilizado o driver pgx (github.com/jackc/pgx/v5).
+Tratamento de erros e exceções no backend
+Cada handler verifica explicitamente os erros e retorna respostas HTTP com códigos apropriados: 400 para dados inválidos, 404 para recurso não encontrado, 503 quando o serviço de estoque está indisponível. No caso da impressão de nota, se o serviço de estoque falhar, o erro é capturado no services/estoque.go e propagado ao handler, que interrompe a operação e retorna o erro ao frontend sem alterar o status da nota — garantindo consistência.

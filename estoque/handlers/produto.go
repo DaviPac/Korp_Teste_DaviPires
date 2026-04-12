@@ -57,25 +57,32 @@ func DebitarSaldo(c *gin.Context) {
 		return
 	}
 
-	var saldoAtual int
-	err := db.DB.QueryRow(
-		"SELECT saldo FROM produtos WHERE codigo = $1", body.Codigo,
-	).Scan(&saldoAtual)
+	result, err := db.DB.Exec(`
+        UPDATE produtos
+        SET saldo = saldo - $1
+        WHERE codigo = $2 AND saldo >= $1
+    `, body.Quantidade, body.Codigo)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if saldoAtual < body.Quantidade {
+	linhasAfetadas, _ := result.RowsAffected()
+	if linhasAfetadas == 0 {
+		var existe bool
+		db.DB.QueryRow(
+			"SELECT EXISTS(SELECT 1 FROM produtos WHERE codigo = $1)", body.Codigo,
+		).Scan(&existe)
+
+		if !existe {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado"})
+			return
+		}
+
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo insuficiente"})
 		return
 	}
-
-	db.DB.Exec(
-		"UPDATE produtos SET saldo = saldo - $1 WHERE codigo = $2",
-		body.Quantidade, body.Codigo,
-	)
 
 	c.JSON(http.StatusOK, gin.H{"mensagem": "Saldo atualizado com sucesso"})
 }
