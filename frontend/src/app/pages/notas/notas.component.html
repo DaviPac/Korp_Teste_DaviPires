@@ -1,47 +1,85 @@
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px">
-  <h2 style="margin: 0">Notas Fiscais</h2>
-  <button mat-raised-button color="primary" routerLink="/notas/nova">
-    + Nova Nota
-  </button>
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Notas Fiscais</h1>
+    <p class="page-sub">Gerencie e emita suas notas fiscais</p>
+  </div>
+  <a mat-raised-button class="btn-dark" routerLink="/notas/nova">
+    <mat-icon>add</mat-icon> Nova nota
+  </a>
 </div>
 
-<table mat-table [dataSource]="notas" style="width: 100%">
+<div class="stats">
+  <mat-card class="stat-card">
+    <div class="stat-label">Total</div>
+    <div class="stat-value">{{ notas.length }}</div>
+  </mat-card>
+  <mat-card class="stat-card">
+    <div class="stat-label">Em aberto</div>
+    <div class="stat-value green">{{ notas | abertas }}</div>
+  </mat-card>
+  <mat-card class="stat-card">
+    <div class="stat-label">Fechadas</div>
+    <div class="stat-value">{{ notas | fechadas }}</div>
+  </mat-card>
+</div>
 
-  <ng-container matColumnDef="numero">
-    <th mat-header-cell *matHeaderCellDef>Número</th>
-    <td mat-cell *matCellDef="let n">{{ n.numero }}</td>
-  </ng-container>
+<mat-card class="table-card">
+  <table mat-table [dataSource]="notas" style="width: 100%">
+    <ng-container matColumnDef="numero">
+      <th mat-header-cell *matHeaderCellDef>Número</th>
+      <td mat-cell *matCellDef="let n" class="mono">#{{ n.numero?.toString().padStart(4, '0') }}</td>
+    </ng-container>
 
-  <ng-container matColumnDef="status">
-    <th mat-header-cell *matHeaderCellDef>Status</th>
-    <td mat-cell *matCellDef="let n">
-      <mat-chip [color]="n.status === 'Aberta' ? 'primary' : 'warn'" highlighted>
-        {{ n.status }}
-      </mat-chip>
-    </td>
-  </ng-container>
+    <ng-container matColumnDef="itens">
+      <th mat-header-cell *matHeaderCellDef>Itens da Nota</th>
+      <td mat-cell *matCellDef="let n">
+        @if (n.itens?.length) {
+          <div class="cupom-fiscal">
+            @for (item of n.itens; track item.codigo) {
+              <div class="cupom-linha">
+                <span class="cupom-codigo">{{ item.codigo }}</span>
+                <span class="cupom-pontilhado"></span>
+                <span class="cupom-qtd">{{ item.quantidade }} un</span>
+              </div>
+            }
+          </div>
+        } @else {
+          <span class="muted">Nenhum produto</span>
+        }
+      </td>
+    </ng-container>
 
-  <ng-container matColumnDef="acoes">
-    <th mat-header-cell *matHeaderCellDef>Ações</th>
-    <td mat-cell *matCellDef="let n">
-      <button
-        mat-raised-button
-        color="accent"
-        [disabled]="n.status !== 'Aberta' || imprimindo === n.id"
-        (click)="imprimir(n)">
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Status</th>
+      <td mat-cell *matCellDef="let n">
+        <mat-chip [class.chip-open]="n.status === 'Aberta'" [class.chip-closed]="n.status === 'Fechada'">
+          {{ n.status }}
+        </mat-chip>
+      </td>
+    </ng-container>
 
-        <mat-spinner
-          *ngIf="imprimindo === n.id"
-          diameter="18"
-          style="display:inline-block; margin-right: 8px">
-        </mat-spinner>
+    <ng-container matColumnDef="acoes">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let n" class="right">
+        <button
+          mat-stroked-button
+          [disabled]="n.status !== 'Aberta' || imprimindo === n.id"
+          (click)="imprimir(n)">
+          @if (imprimindo === n.id) {
+            <mat-spinner diameter="16" />
+          } @else {
+            <mat-icon>print</mat-icon>
+          }
+          {{ imprimindo === n.id ? 'Imprimindo...' : 'Imprimir' }}
+        </button>
+      </td>
+    </ng-container>
 
-        <mat-icon *ngIf="imprimindo !== n.id">print</mat-icon>
-        {{ imprimindo === n.id ? 'Imprimindo...' : 'Imprimir' }}
-      </button>
-    </td>
-  </ng-container>
+    <tr mat-header-row *matHeaderRowDef="colunas"></tr>
+    <tr mat-row *matRowDef="let row; columns: colunas;"></tr>
+  </table>
 
-  <tr mat-header-row *matHeaderRowDef="colunas"></tr>
-  <tr mat-row *matRowDef="let row; columns: colunas;"></tr>
-</table>
+  @if (notas.length === 0) {
+    <p class="empty">Nenhuma nota cadastrada.</p>
+  }
+</mat-card>

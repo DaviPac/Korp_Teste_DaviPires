@@ -2,6 +2,11 @@ services:
 
   db_estoque:
     image: postgres:16
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d estoque"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -25,7 +30,8 @@ services:
     environment:
       DATABASE_URL: postgres://postgres:postgres@db_estoque:5432/estoque?sslmode=disable
     depends_on:
-      - db_estoque
+      db_estoque:
+        condition: service_healthy
 
   faturamento:
     build: ./faturamento
@@ -37,3 +43,13 @@ services:
     depends_on:
       - db_faturamento
       - estoque
+
+  assistente:
+    build: ./assistente
+    ports:
+      - "8083:8083"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      - estoque
+      - faturamento

@@ -1,8 +1,15 @@
-<mat-toolbar color="primary">
-  <span>Korp ERP</span>
-  <button mat-button routerLink="/produtos">Produtos</button>
-  <button mat-button routerLink="/notas">Notas Fiscais</button>
+<mat-toolbar class="topbar">
+  <div class="logo">
+    <div class="logo-dot"></div>
+    Korp ERP
+  </div>
+  <nav class="nav">
+    <a mat-button routerLink="/produtos" routerLinkActive="nav-active">Produtos</a>
+    <a mat-button routerLink="/notas" routerLinkActive="nav-active">Notas Fiscais</a>
+  </nav>
+  <span class="topbar-sub">Sistema de Emissão de NF</span>
 </mat-toolbar>
-<div style="padding: 24px">
+<div class="page-content">
   <router-outlet />
 </div>
+<app-ai-chat />

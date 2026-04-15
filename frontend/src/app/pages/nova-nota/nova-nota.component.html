@@ -9,13 +9,23 @@
       style="display:flex; flex-direction:column; gap:12px; margin-top:16px">
 
       <mat-form-field>
-        <mat-label>Código do Produto</mat-label>
-        <input matInput formControlName="codigo" />
+        <mat-label>Produto</mat-label>
+        <mat-select formControlName="codigo">
+          <mat-option *ngFor="let produto of produtos" [value]="produto.codigo">
+            {{ produto.codigo }} - {{ produto.descricao }} (Saldo: {{ produto.saldo }})
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="itemForm.get('codigo')?.hasError('required')">
+          Selecione um produto
+        </mat-error>
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>Quantidade</mat-label>
         <input matInput type="number" formControlName="quantidade" />
+        <mat-error *ngIf="itemForm.get('quantidade')?.hasError('min')">
+          A quantidade deve ser maior que 0
+        </mat-error>
       </mat-form-field>
 
       <button mat-raised-button color="primary" type="submit" [disabled]="itemForm.invalid">

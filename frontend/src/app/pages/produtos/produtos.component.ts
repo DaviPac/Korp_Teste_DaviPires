@@ -1,56 +1,57 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { Subject, takeUntil } from 'rxjs';
+import { ReactiveFormsModule, FormBuilder, Validators, FormGroup } from '@angular/forms';
+import { Subject, filter, takeUntil } from 'rxjs';
 
-import { MatTableModule } from '@angular/material/table';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatCardModule } from '@angular/material/card';
+import { MatTableModule } from '@angular/material/table';
+import { MatChipsModule } from '@angular/material/chips';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { ProdutoService, Produto } from '../../services/produto.service';
+import { RefreshService } from '../../services/refresh.service';
 
 @Component({
   selector: 'app-produtos',
   standalone: true,
   imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    MatTableModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatButtonModule,
-    MatSnackBarModule,
-    MatCardModule,
+    CommonModule, ReactiveFormsModule,
+    MatFormFieldModule, MatInputModule, MatButtonModule,
+    MatCardModule, MatTableModule, MatChipsModule, MatSnackBarModule,
   ],
   templateUrl: './produtos.component.html',
+  styleUrl: './produtos.component.scss'
 })
 export class ProdutosComponent implements OnInit, OnDestroy {
   produtos: Produto[] = [];
   colunas = ['codigo', 'descricao', 'saldo'];
   private destroy$ = new Subject<void>();
-  form: ReturnType<FormBuilder['group']>;
+
+  form: FormGroup;
 
   constructor(
     private fb: FormBuilder,
     private produtoService: ProdutoService,
+    private refreshService: RefreshService,
     private snackBar: MatSnackBar,
   ) {
-    this.form = this.fb.group({
-    codigo:    ['', Validators.required],
-    descricao: ['', Validators.required],
-    saldo:     [0,  Validators.required],
-  });
+      this.form = fb.group({
+      codigo:    ['', Validators.required],
+      descricao: ['', Validators.required],
+      saldo:     [0,  [Validators.required, Validators.min(0)]],
+    });
   }
 
-  // ngOnInit — ciclo de vida usado para carregar dados ao abrir a tela
   ngOnInit() {
     this.carregarProdutos();
+    this.refreshService.onRefresh$
+      .pipe(filter(t => t === 'produtos'), takeUntil(this.destroy$))
+      .subscribe(() => this.carregarProdutos());
   }
 
-  // ngOnDestroy — ciclo de vida usado para cancelar subscriptions e evitar memory leak
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
@@ -67,7 +68,6 @@ export class ProdutosComponent implements OnInit, OnDestroy {
 
   salvar() {
     if (this.form.invalid) return;
-
     this.produtoService.criar(this.form.value as Produto)
       .pipe(takeUntil(this.destroy$))
       .subscribe({

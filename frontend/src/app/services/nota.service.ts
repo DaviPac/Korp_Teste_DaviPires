@@ -24,8 +24,12 @@ export class NotaService {
     return this.http.get<Nota[]>(`${this.url}/notas`);
   }
 
-  criar(nota: Nota): Observable<Nota> {
-    return this.http.post<Nota>(`${this.url}/notas`, nota);
+  criar(nota: Nota, idempotencyKey: string): Observable<Nota> {
+    return this.http.post<Nota>(
+      `${this.url}/notas`,
+      nota,
+      { headers: { 'Idempotency-Key': idempotencyKey } }
+    );
   }
 
   imprimir(id: number): Observable<any> {

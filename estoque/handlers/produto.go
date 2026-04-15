@@ -48,41 +48,57 @@ func CriarProduto(c *gin.Context) {
 
 func DebitarSaldo(c *gin.Context) {
 	var body struct {
-		Codigo     string `json:"codigo"`
-		Quantidade int    `json:"quantidade"`
-	}
+        Itens []struct {
+            Codigo     string `json:"codigo"`
+            Quantidade int    `json:"quantidade"`
+        } `json:"itens"`
+    }
 
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
-		return
-	}
+    if err := c.ShouldBindJSON(&body); err != nil || len(body.Itens) == 0 {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Dados inválidos"})
+        return
+    }
 
-	result, err := db.DB.Exec(`
-        UPDATE produtos
-        SET saldo = saldo - $1
-        WHERE codigo = $2 AND saldo >= $1
-    `, body.Quantidade, body.Codigo)
+    tx, err := db.DB.Begin()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao iniciar transação"})
+        return
+    }
+    defer tx.Rollback()
 
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+    for _, item := range body.Itens {
+        result, err := tx.Exec(`
+            UPDATE produtos
+            SET saldo = saldo - $1
+            WHERE codigo = $2 AND saldo >= $1
+        `, item.Quantidade, item.Codigo)
 
-	linhasAfetadas, _ := result.RowsAffected()
-	if linhasAfetadas == 0 {
-		var existe bool
-		db.DB.QueryRow(
-			"SELECT EXISTS(SELECT 1 FROM produtos WHERE codigo = $1)", body.Codigo,
-		).Scan(&existe)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
-		if !existe {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado"})
-			return
-		}
+        linhasAfetadas, _ := result.RowsAffected()
+        if linhasAfetadas == 0 {
+            var existe bool
+            tx.QueryRow(
+                "SELECT EXISTS(SELECT 1 FROM produtos WHERE codigo = $1)", item.Codigo,
+            ).Scan(&existe)
 
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo insuficiente"})
-		return
-	}
+            if !existe {
+                c.JSON(http.StatusNotFound, gin.H{"error": "Produto não encontrado: " + item.Codigo})
+                return
+            }
 
-	c.JSON(http.StatusOK, gin.H{"mensagem": "Saldo atualizado com sucesso"})
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Saldo insuficiente para: " + item.Codigo})
+            return
+        }
+    }
+
+    if err = tx.Commit(); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Erro ao confirmar transação"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"mensagem": "Estoque atualizado com sucesso"})
 }

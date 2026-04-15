@@ -1,0 +1,117 @@
+<div class="chat-wrapper">
+  @if (isOpen) {
+    <mat-card class="chat-panel">
+      <div class="chat-header">
+        <div class="header-left">
+          <div class="header-dot"></div>
+          Assistente Korp
+        </div>
+        <button mat-icon-button class="close-btn" (click)="toggleChat()">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="messages" #messagesContainer>
+        @if (messages.length === 0) {
+          <p class="empty-state">Olá! Posso ajudar a cadastrar produtos ou criar notas fiscais.</p>
+        }
+
+        @for (msg of messages; track $index) {
+          <div class="msg" [class.user]="msg.sender === 'user'" [class.ai]="msg.sender === 'ai'">
+            {{ msg.text }}
+          </div>
+        }
+
+        @if (isLoading) {
+          <div class="msg ai typing">
+            <span></span><span></span><span></span>
+          </div>
+        }
+
+        @if (pendingOperation?.operacao === 'cadastrar_produto') {
+          <div class="form-card" [formGroup]="produtoForm">
+            <p class="form-title">Confirme os dados do Produto</p>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Código</mat-label>
+              <input matInput formControlName="codigo" placeholder="Ex: PRD-001" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Descrição</mat-label>
+              <input matInput formControlName="descricao" placeholder="Ex: Teclado Mecânico" />
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Saldo Inicial</mat-label>
+              <input matInput type="number" formControlName="saldo" min="0" />
+            </mat-form-field>
+
+            <div class="form-actions">
+              <button mat-raised-button class="btn-confirm" (click)="confirmOperation()" [disabled]="produtoForm.invalid || isLoading">
+                Confirmar
+              </button>
+              <button mat-stroked-button (click)="cancelOperation()">Cancelar</button>
+            </div>
+          </div>
+        }
+
+        @if (pendingOperation?.operacao === 'criar_nota') {
+          <div class="form-card" [formGroup]="notaForm">
+            <div class="form-header-row">
+              <p class="form-title">Itens da Nota</p>
+              <button mat-icon-button class="btn-add-mini" (click)="adicionarItemNota()" type="button" title="Adicionar Item">
+                <mat-icon>add</mat-icon>
+              </button>
+            </div>
+
+            <div class="items-container">
+              @for (item of itens.controls; track $index) {
+                <div class="item-row" [formGroup]="$any(item)">
+                  <mat-form-field appearance="outline">
+                    <mat-label>Código</mat-label>
+                    <input matInput formControlName="codigo" placeholder="Cód." />
+                  </mat-form-field>
+                  
+                  <mat-form-field appearance="outline" class="qty-field">
+                    <mat-label>Qtd</mat-label>
+                    <input matInput type="number" formControlName="quantidade" min="1" />
+                  </mat-form-field>
+
+                  <button mat-icon-button class="btn-remove-item" (click)="removerItemNota($index)" [disabled]="itens.length === 1" type="button" title="Remover">
+                    <mat-icon>delete_outline</mat-icon>
+                  </button>
+                </div>
+              }
+            </div>
+
+            <div class="form-actions">
+              <button mat-raised-button class="btn-confirm" (click)="confirmOperation()" [disabled]="notaForm.invalid || isLoading">
+                Confirmar
+              </button>
+              <button mat-stroked-button (click)="cancelOperation()">Cancelar</button>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="chat-input-wrapper">
+        <input
+          type="text"
+          class="chat-input"
+          [(ngModel)]="userInput"
+          (keydown.enter)="$event.preventDefault(); sendMessage()"
+          placeholder="Digite uma instrução..."
+          [disabled]="isLoading"
+        />
+        <button mat-icon-button class="send-btn" (click)="sendMessage()" [disabled]="!userInput.trim() || isLoading">
+          <mat-icon>send</mat-icon>
+        </button>
+      </div>
+    </mat-card>
+  }
+
+  <button mat-fab class="fab" (click)="toggleChat()" color="primary">
+    <mat-icon>{{ isOpen ? 'close' : 'chat' }}</mat-icon>
+  </button>
+</div>

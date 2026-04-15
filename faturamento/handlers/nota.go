@@ -18,13 +18,28 @@ func ListarNotas(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var notas []models.Nota
+	notas := make([]models.Nota, 0)
+
 	for rows.Next() {
 		var n models.Nota
 		rows.Scan(&n.ID, &n.Numero, &n.Status)
+		n.Itens = make([]models.ItemNota, 0)
+
+		itemRows, err := db.DB.Query(
+			"SELECT id, nota_id, codigo, quantidade FROM itens_nota WHERE nota_id = $1", 
+			n.ID,
+		)
+		
+		if err == nil {
+			for itemRows.Next() {
+				var item models.ItemNota
+				itemRows.Scan(&item.ID, &item.NotaID, &item.Codigo, &item.Quantidade)
+				n.Itens = append(n.Itens, item)
+			}
+			itemRows.Close()
+		}
 		notas = append(notas, n)
 	}
-
 	c.JSON(http.StatusOK, notas)
 }
 
@@ -69,55 +84,73 @@ func CriarNota(c *gin.Context) {
 }
 
 func ImprimirNota(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+    id, _ := strconv.Atoi(c.Param("id"))
 
-	var nota models.Nota
-	err := db.DB.QueryRow(
+    result, err := db.DB.Exec(`
+        UPDATE notas SET status = 'Fechada' 
+        WHERE id = $1 AND status = 'Aberta'
+    `, id)
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+        return
+    }
+
+    linhasAfetadas, _ := result.RowsAffected()
+    if linhasAfetadas == 0 {
+        var status string
+        err := db.DB.QueryRow("SELECT status FROM notas WHERE id = $1", id).Scan(&status)
+        if err != nil {
+            c.JSON(http.StatusNotFound, gin.H{"error": "Nota não encontrada"})
+            return
+        }
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas notas com status Aberta podem ser impressas"})
+        return
+    }
+
+    var nota models.Nota
+    err = db.DB.QueryRow(
 		"SELECT id, numero, status FROM notas WHERE id = $1", id,
 	).Scan(&nota.ID, &nota.Numero, &nota.Status)
 
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Nota não encontrada"})
-		return
-	}
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Nota não encontrada"})
+        return
+    }
 
-	if nota.Status != "Aberta" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Apenas notas com status Aberta podem ser impressas"})
-		return
-	}
+    rows, _ := db.DB.Query(
+        "SELECT id, nota_id, codigo, quantidade FROM itens_nota WHERE nota_id = $1", id,
+    )
+    defer rows.Close()
 
-	// Busca os itens da nota
-	rows, _ := db.DB.Query(
-		"SELECT id, nota_id, codigo, quantidade FROM itens_nota WHERE nota_id = $1", id,
-	)
-	defer rows.Close()
+    var itens []models.ItemNota
+    for rows.Next() {
+        var item models.ItemNota
+        rows.Scan(&item.ID, &item.NotaID, &item.Codigo, &item.Quantidade)
+        itens = append(itens, item)
+    }
 
-	var itens []models.ItemNota
-	for rows.Next() {
-		var item models.ItemNota
-		rows.Scan(&item.ID, &item.NotaID, &item.Codigo, &item.Quantidade)
-		itens = append(itens, item)
-	}
+    var lote []services.ItemDebito
+    for _, item := range itens {
+        lote = append(lote, services.ItemDebito{
+            Codigo:     item.Codigo,
+            Quantidade: item.Quantidade,
+        })
+    }
+    err = services.DebitarEstoque(lote)
+    if err != nil {
+        db.DB.Exec("UPDATE notas SET status = 'Aberta' WHERE id = $1", id)
+        c.JSON(http.StatusServiceUnavailable, gin.H{
+            "error": "Falha ao atualizar estoque: " + err.Error(),
+        })
+        return
+    }
 
-	// Debita cada item no serviço de estoque
-	for _, item := range itens {
-		if err := services.DebitarEstoque(item.Codigo, item.Quantidade); err != nil {
-			// Falha no estoque — retorna erro claro sem alterar status da nota
-			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"error": "Falha ao atualizar estoque: " + err.Error(),
-			})
-			return
-		}
-	}
-
-	// Só fecha a nota se tudo deu certo no estoque
-	db.DB.Exec("UPDATE notas SET status = 'Fechada' WHERE id = $1", id)
-
-	c.JSON(http.StatusOK, gin.H{
-		"mensagem": "Nota impressa com sucesso",
-		"id":       nota.ID,
-		"numero":   nota.Numero,
-		"status":   "Fechada",
-		"itens":    itens,
-	})
+    c.JSON(http.StatusOK, gin.H{
+        "mensagem": "Nota impressa com sucesso",
+        "id":       nota.ID,
+        "numero":   nota.Numero,
+        "status":   "Fechada",
+        "itens":    itens,
+    })
 }
