@@ -24,6 +24,7 @@ func Init() {
 	}
 
 	criarTabelas()
+	IniciarLimpezaIdempotencia()
 	log.Println("Banco de faturamento conectado!")
 }
 
@@ -42,4 +43,31 @@ func criarTabelas() {
         codigo     VARCHAR(50) NOT NULL,
         quantidade INTEGER NOT NULL
     );`)
+
+	DB.Exec(`
+    CREATE TABLE IF NOT EXISTS operacoes_idempotentes (
+        chave      VARCHAR(100) PRIMARY KEY,
+        resultado  TEXT NOT NULL,
+        criado_em  TIMESTAMP DEFAULT NOW()
+    );`)
+}
+
+func IniciarLimpezaIdempotencia() {
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+			result, err := DB.Exec(`
+				DELETE FROM operacoes_idempotentes
+				WHERE criado_em < NOW() - INTERVAL '24 hours'
+			`)
+			if err != nil {
+				log.Println("Erro ao limpar chaves de idempotência:", err)
+				continue
+			}
+			rows, _ := result.RowsAffected()
+			if rows > 0 {
+				log.Printf("Limpeza de idempotência: %d chaves expiradas removidas", rows)
+			}
+		}
+	}()
 }
